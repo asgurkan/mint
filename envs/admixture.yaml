@@ -1,0 +1,6 @@
+name: admixture_env
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - admixture
