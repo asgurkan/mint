@@ -1,0 +1,20 @@
+Reading eigenvalues from: data/pca/pca.eigenval 
+Read 20 items
+Reading PCA eigenvectors from: data/pca/pca.eigenvec 
+Reading sample TSV from: sample.tsv 
+Merging PCA data with metadata...
+Generating PCA (PC1 vs PC2) plot...
+Saving PC1 vs PC2 plots to: report/pca 
+✔ Created directory: 'report/pca/PC1_PC2'.
+Warning message:
+ggrepel: 47 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+Warning message:
+ggrepel: 47 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+Generating PCA (PC2 vs PC3) plot...
+Saving PC2 vs PC3 plots to: report/pca 
+✔ Created directory: 'report/pca/PC2_PC3'.
+Warning messages:
+1: ggrepel: 46 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+2: ggrepel: 46 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+
+PCA plots saved successfully.
