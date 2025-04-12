@@ -2,7 +2,16 @@ name: pca_graph
 channels:
   - conda-forge
   - defaults
+  - bioconda
+  - r
 dependencies:
   - r-base=4.3
   - r-ggplot2
   - r-ggrepel
+  - r-vcfR
+  - r-devtools  # Needed for installing packages from GitHub
+  - r-BiocManager  # For installing Bioconductor packages
+  - bioconductor-genomicranges  # Bioconductor package for GenomicRanges
+  - bioconductor-rsamtools     # Bioconductor package for Rsamtools
+  - bioconductor-rhtslib       # Bioconductor package for Rhtslib
+  - bioconductor-biostrings    # Bioconductor package for Biostrings

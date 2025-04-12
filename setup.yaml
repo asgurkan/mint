@@ -1,4 +1,4 @@
-name: population-genomics
+name: mint
 channels:
   - conda-forge
   - bioconda

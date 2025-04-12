@@ -27,11 +27,11 @@ if len(pop_files) < 2:
 # Rule all
 rule all:
     input:
-        #expand("data/{project}_report/figures/pca", project = get_projects()) 
-        #expand("data/raw/{sample}/{sample}.vcf", sample=get_samples())
-        #expand(["data/admixture/cv_error/admixture_cv_error_K{K}.txt", "report/pca"], K = config["admixture"]["k_value"])
-        #expand("data/fst/{project}.windowed.weir.fst", project = get_projects())
-        expand("data/{project}_report/figures/fst/fst_manhattan_locus.png", project = get_projects())
+        expand("data/{project}_report/figures/pca", project = get_projects()) ,
+        # expand("data/raw/{sample}/{sample}.vcf", sample=get_samples()),
+        expand(["data/admixture/cv_error/admixture_cv_error_K{K}.txt"], K = config["admixture"]["k_value"]),
+        expand("data/{project}_report/figures/fst/fst_manhattan_locus.png", project = get_projects()),
+        "data/dxy_results.csv"
 
 ## Rules 
 rule vcf_split_sample:
@@ -238,3 +238,18 @@ rule fst_manhattan:
     script:
         "scripts/fst_manhattan_windowed.py"
 
+rule pi_dxy_calculation:
+    input:
+        merged_vcf = "/home/asgurkan/Documents/population_genomics/data/merged/merged.vcf.gz",
+        population1 = pop_files[0],
+        population2 = pop_files[1]
+    output:
+        dxy_text_file = "data/dxy_results.csv",
+        pi_text_file = "data/pi_results.csv"
+    conda:
+        "envs/pca_graph.yaml"
+    log:
+        dxy_log_file = "logs/dxy_log_file.txt",
+        pi_log_file = "logs/pi_log_file.txt"
+    script:
+        "scripts/pi_dxy_calculation.R"

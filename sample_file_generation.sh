@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Sample TSV creation script.
+# Sample TSV and population files creation script.
 # This script validates a VCF file, extracts sample names,
 # and generates a "sample.tsv" file with specific columns.
 # Additionally, it creates population files based on the population column.

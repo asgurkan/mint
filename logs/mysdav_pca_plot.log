@@ -14,7 +14,7 @@ Generating PCA (PC2 vs PC3) plot...
 Saving PC2 vs PC3 plots to: data/mysdav_report/figures/pca 
 ✔ Created directory: 'data/mysdav_report/figures/pca/PC2_PC3'.
 Warning messages:
-1: ggrepel: 46 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
-2: ggrepel: 46 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+1: ggrepel: 47 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
+2: ggrepel: 47 unlabeled data points (too many overlaps). Consider increasing max.overlaps 
 
 PCA plots saved successfully.
