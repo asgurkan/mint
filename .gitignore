@@ -4,3 +4,6 @@ workspace
 short_deneme.vcf
 march_data
 report
+sample.tsv
+logs
+population_files

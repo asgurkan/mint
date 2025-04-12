@@ -3,6 +3,7 @@
 # Sample TSV creation script.
 # This script validates a VCF file, extracts sample names,
 # and generates a "sample.tsv" file with specific columns.
+# Additionally, it creates population files based on the population column.
 #
 # Usage:
 #   ./create_sample_tsv.sh <input_vcf> <project_name>
@@ -110,3 +111,16 @@ bcftools query -l "$INPUT_VCF" | awk -v project="$PROJECT_NAME" -v path="$INPUT_
 }' >> sample.tsv
 
 log "INFO" "sample.tsv created successfully!"
+
+# ---- Create population files ----
+log "INFO" "Creating population files..."
+# Read population names from the sample.tsv and create individual population files
+awk -F'\t' 'NR > 1 {print $2}' sample.tsv | sort | uniq | while read population; do
+    # Create a population file for each population
+    population_file="population_files/$population.txt"
+    mkdir -p population_files  # Ensure the directory exists
+    awk -v pop="$population" -F'\t' '$2 == pop {print $1}' sample.tsv > "$population_file"
+    log "INFO" "Population file created: $population_file"
+done
+
+log "INFO" "Population files created successfully!"
