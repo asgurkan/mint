@@ -1,4 +1,5 @@
 import pandas as pd
+import glob
 
 configfile: "config.yml"
 
@@ -18,12 +19,19 @@ def get_raw_vcf():
     """ Returns raw vcf path. """
     return samples["path"].unique()
 
+# population file paths variable creation and control
+pop_files = sorted(glob.glob("population_files/*.txt"))
+if len(pop_files) < 2:
+    raise ValueError("At least two population files are required for FST analysis.")
+
 # Rule all
 rule all:
     input:
+        #expand("data/{project}_report/figures/pca", project = get_projects()) 
         #expand("data/raw/{sample}/{sample}.vcf", sample=get_samples())
-        expand(["data/admixture/cv_error/admixture_cv_error_K{K}.txt", "report/pca"], K = config["admixture"]["k_value"])
-        # "data/admixture/admixture_cv_error.txt"
+        #expand(["data/admixture/cv_error/admixture_cv_error_K{K}.txt", "report/pca"], K = config["admixture"]["k_value"])
+        #expand("data/fst/{project}.windowed.weir.fst", project = get_projects())
+        expand("data/{project}_report/figures/fst/fst_manhattan_locus.png", project = get_projects())
 
 ## Rules 
 rule vcf_split_sample:
@@ -170,11 +178,11 @@ rule pca_graph:
         eigenval_path = "data/pca/pca.eigenval",
         sample_tsv_path = "sample.tsv"
     output:
-        pca_output_dir = directory("report/pca")
+        pca_output_dir = directory("data/{project}_report/figures/pca")
     conda:
         "envs/pca_graph.yaml"
     log:
-        "logs/pca_plot.log"
+        "logs/{project}_pca_plot.log"
     script:
         "scripts/pca_plot.R"
 
@@ -198,4 +206,35 @@ rule admixture:
         mv pruned.{params.K}.P {output.P}
         mv pruned.{params.K}.Q {output.Q}
         """
+        
+rule fst:
+    input:
+        input_vcf = "/home/asgurkan/Documents/population_genomics/march_data/raw/mysdav_renamed.vcf"
+    output:
+        windowed_fst = "data/fst/{project}.windowed.weir.fst"
+    params:
+        window_size = config["fst"]["window-size"],
+        window_step = config["fst"]["window-step"],
+        weir_fst_pops = " ".join([f"--weir-fst-pop {pop_file}" for pop_file in pop_files]),
+        prefix = "data/fst/{project}"
+    conda:
+        "envs/vcftools.yaml"
+    shell:
+     """
+        vcftools \
+            --vcf {input.input_vcf} {params.weir_fst_pops} \
+            --fst-window-size {params.window_size} \
+            --fst-window-step {params.window_step} \
+            --out {params.prefix}
+        """
+
+rule fst_manhattan:
+    input:
+        windowed_fst = "data/fst/{project}.windowed.weir.fst"
+    output:
+        fst_manhattan_image = "data/{project}_report/figures/fst/fst_manhattan_locus.png"
+    conda:
+        "envs/py_visualization.yaml"
+    script:
+        "scripts/fst_manhattan_windowed.py"
 

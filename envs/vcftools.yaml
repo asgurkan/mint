@@ -1,0 +1,7 @@
+name: vcftools_env
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - vcftools
+

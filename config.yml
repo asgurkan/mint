@@ -2,3 +2,7 @@ raw_vcf_file_path : /home/asgurkan/Documents/population_genomics/short_deneme.vc
 
 admixture:
   k_value: 1
+
+fst:
+  window-size : 100000
+  window-step : 50000
