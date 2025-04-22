@@ -3,8 +3,12 @@ import glob
 
 configfile: "config.yml"
 
+# paths 
+gb_file_path = "gb_file_path.txt"
+sample_tsv_path = "sample.tsv"
+
 ### Variables 
-samples = pd.read_csv("sample.tsv", sep = "\t")
+samples = pd.read_csv(sample_tsv_path, sep = "\t")
 
 ### Functions
 def get_samples():
@@ -19,6 +23,11 @@ def get_raw_vcf():
     """ Returns raw vcf path. """
     return samples["path"].unique()
 
+def ref_gb():
+    f = open("gb_file_path.txt", "r")
+    gb_file_path = f.readline().rstrip("\n")
+    return gb_file_path
+
 # population file paths variable creation and control
 pop_files = sorted(glob.glob("population_files/*.txt"))
 if len(pop_files) < 2:
@@ -27,9 +36,13 @@ if len(pop_files) < 2:
 # Rule all
 rule all:
     input:
-        expand("data/{project}/ld_pruning/temp.prune.in", project = get_project())
+        #expand("data/{project}/annotations/annotations.csv", project = get_project())
+        #directory(expand(("data/{project}/figures/locus_wise_syn_analysis"), project = get_project()))
         #expand("data/{project}/variants/filtered.vcf.gz", project = get_project())
-
+        #expand("data/{project}/figures/pca", project = get_project())
+        #expand("data/{project}/figures/fst/fst_manhattan_locus.png", project = get_project())
+        #expand("data/{project}/admixture/K{K}", project = get_project(), K = config["admixture"]["k_value"])
+        expand("data/{project}/report_complete{K}.txt", project = get_project(), K = config["admixture"]["k_value"]) 
 
 # Rules 
 rule retrieve_raw_vcf:
@@ -48,10 +61,64 @@ rule pop_variant_filter:
     conda:
         "envs/bcftools.yaml"
     params:
-        filter_expr='MAF>=0.05 && COUNT(GT=="./.")/N_SAMPLES<0.5',
+        filter_expr='MAF>=0.05'
+        # filter_expr='MAF>=0.05 && COUNT(GT=="./.")/N_SAMPLES<0.5'
     shell:
         "bcftools filter -i '{params.filter_expr}' {input.raw_vcf} -o {output.filtered_vcf}"
 
+rule rename_vcf_locus:
+    input:
+        vcf = "data/{project}/variants/filtered.vcf",
+        ref_gb = ref_gb()
+    output:
+        annotated_vcf = "data/{project}/variants/filtered_renamed.vcf"
+    conda:
+        "envs/vcf_annotator.yaml"
+    script:
+        "scripts/rename_vcf.py"
+
+rule annotate_vcf:
+    input:
+        vcf = "data/{project}/variants/filtered_renamed.vcf",
+        ref_gb = ref_gb()
+    output:
+        annotated_vcf = "data/{project}/annotations/annotated.vcf"
+    conda:
+        "envs/vcf_annotator.yaml"
+    shell:
+        """
+        vcf-annotator --output {output.annotated_vcf} {input.vcf} {input.ref_gb} 
+        """
+
+rule vcf2csv:
+    input:
+        annotated_vcf = "data/{project}/annotations/annotated.vcf"
+    output:
+        annotations_csv = "data/{project}/annotations/annotations.csv"
+    conda:
+        "envs/vcf_annotator.yaml"
+    script:
+        "scripts/annotation2csv.py"
+
+rule annotation_dist_piechart:
+    input:
+        annotations_csv = "data/{project}/annotations/annotations.csv"
+    output:
+        piechart = "data/{project}/figures/annotation_dist_piechart.png"
+    conda:
+        "envs/py_visualization.yaml"
+    script:
+        "scripts/annotation_dist_piechart.py"
+
+rule gene_syn_dist:
+    input:
+        annotations_csv = "data/{project}/annotations/annotations.csv"
+    output:
+        locus_wise_syn_dir = directory("data/{project}/figures/locus_wise_syn_analysis")
+    conda:
+        "envs/py_visualization.yaml"
+    script:
+        "scripts/gene_syn_dist.py"
 
 rule gzip_merge:
     input:
@@ -61,11 +128,10 @@ rule gzip_merge:
     shell:
         "bgzip -k {input.merged} -o {output.merged_gz}"
 
-
 rule ld_pruning:
     input:
-        # vcf = "data/{project}/variants/filtered.vcf"      # check filtering exp. 
-        vcf = "data/{project}/variants/raw.vcf"
+        #vcf = "data/{project}/variants/raw.vcf"      # check filtering exp. 
+        vcf = "data/{project}/variants/filtered.vcf"
     output:
         prune_in="data/{project}/ld_pruning/temp.prune.in",
         prune_out="data/{project}/ld_pruning/temp.prune.out",
@@ -95,53 +161,59 @@ rule ld_pruning:
 
 rule extract_pruned_variants:
     input:
-        bed="data/ld_pruning/temp.bed",
-        bim="data/ld_pruning/temp.bim",
-        fam="data/ld_pruning/temp.fam",
-        prune_in="data/ld_pruning/temp.prune.in",
+        bed="data/{project}/ld_pruning/temp.bed",
+        bim="data/{project}/ld_pruning/temp.bim",
+        fam="data/{project}/ld_pruning/temp.fam",
+        prune_in="data/{project}/ld_pruning/temp.prune.in",
     output:
-        bed="data/ld_pruning/pruned.bed",
-        bim="data/ld_pruning/pruned.bim",
-        fam="data/ld_pruning/pruned.fam",
+        bed="data/{project}/ld_pruning/pruned.bed",
+        bim="data/{project}/ld_pruning/pruned.bim",
+        fam="data/{project}/ld_pruning/pruned.fam",
     conda:
         "envs/plink.yaml"
+    params: 
+        temp_folder = "data/{project}/ld_pruning/temp",
+        pruned_folder = "data/{project}/ld_pruning/pruned"
     shell:
         """
-        plink --bfile data/ld_pruning/temp \
+        plink --bfile {params.temp_folder} \
               --extract {input.prune_in} \
               --make-bed \
               --chr-set 92 \
               --allow-extra-chr \
-              --out data/ld_pruning/pruned
+              --out {params.pruned_folder}
         """
 
 rule pca:
     input:
-        bed="data/ld_pruning/temp.bed",
-        bim="data/ld_pruning/temp.bim",
-        fam="data/ld_pruning/temp.fam",
+        bed = "data/{project}/ld_pruning/pruned.bed",
+        bim = "data/{project}/ld_pruning/pruned.bim",
+        fam = "data/{project}/ld_pruning/pruned.fam",
     output:
-        eigenvec="data/pca/pca.eigenvec",
-        eigenval="data/pca/pca.eigenval",
+        eigenvec = "data/{project}/pca/pca.eigenvec",
+        eigenval = "data/{project}/pca/pca.eigenval",
     conda:
         "envs/plink.yaml"
+    params: 
+        pca_folder = "data/{project}/pca",
+        temp_folder = "data/{project}/ld_pruning/pruned"
     shell:
         """
-        mkdir -p data/pca
-        plink --bfile data/ld_pruning/temp \
+        mkdir -p {params.pca_folder}
+        plink --bfile {params.temp_folder} \
               --allow-extra-chr \
               --chr-set 92 \
               --pca \
-              --out data/pca/pca
+              --out {params.pca_folder}/pca
         """
 
 rule pca_graph:
     input: 
-        eigenvec_path = "data/pca/pca.eigenvec",
-        eigenval_path = "data/pca/pca.eigenval",
-        sample_tsv_path = "sample.tsv"
+        eigenvec_path = "data/{project}/pca/pca.eigenvec",
+        eigenval_path = "data/{project}/pca/pca.eigenval",
+        sample_tsv = sample_tsv_path
     output:
-        pca_output_dir = directory("data/{project}_report/figures/pca")
+        pca_output_dir = directory("data/{project}/figures/pca")
     conda:
         "envs/pca_graph.yaml"
     log:
@@ -151,16 +223,16 @@ rule pca_graph:
 
 rule admixture:
     input:
-        bed="data/ld_pruning/pruned.bed",
-        bim="data/ld_pruning/pruned.bim",
-        fam="data/ld_pruning/pruned.fam",
+        bed = "data/{project}/ld_pruning/pruned.bed",
+        bim = "data/{project}/ld_pruning/pruned.bim",
+        fam = "data/{project}/ld_pruning/pruned.fam",
     output:
-        cv_error="data/admixture/cv_error/admixture_cv_error_K{K}.txt",
-        output=directory("data/admixture/K{K}"),
-        P="data/admixture/K{K}/pruned.{K}.P",
-        Q="data/admixture/K{K}/pruned.{K}.Q"
+        cv_error = "data/{project}/admixture/cv_error/admixture_cv_error_K{K}.txt",
+        output = directory("data/{project}/admixture/K{K}"),
+        P = "data/{project}/admixture/K{K}/pruned.{K}.P",
+        Q = "data/{project}/admixture/K{K}/pruned.{K}.Q"
     params:
-        K=config["admixture"]["k_value"]
+        K = config["admixture"]["k_value"]
     conda:
         "envs/admixture.yaml"
     shell:
@@ -169,17 +241,17 @@ rule admixture:
         mv pruned.{params.K}.P {output.P}
         mv pruned.{params.K}.Q {output.Q}
         """
-        
+
 rule fst:
     input:
-        input_vcf = "/home/asgurkan/Documents/population_genomics/march_data/raw/mysdav_renamed.vcf"
+        input_vcf = "data/{project}/variants/filtered.vcf"
     output:
-        windowed_fst = "data/fst/{project}.windowed.weir.fst"
+        windowed_fst = "data/{project}/fst/{project}.windowed.weir.fst"
     params:
         window_size = config["fst"]["window-size"],
         window_step = config["fst"]["window-step"],
         weir_fst_pops = " ".join([f"--weir-fst-pop {pop_file}" for pop_file in pop_files]),
-        prefix = "data/fst/{project}"
+        prefix = "data/{project}/fst/{project}"
     conda:
         "envs/vcftools.yaml"
     shell:
@@ -193,9 +265,9 @@ rule fst:
 
 rule fst_manhattan:
     input:
-        windowed_fst = "data/fst/{project}.windowed.weir.fst"
+        windowed_fst = "data/{project}/fst/{project}.windowed.weir.fst"
     output:
-        fst_manhattan_image = "data/{project}_report/figures/fst/fst_manhattan_locus.png"
+        fst_manhattan_image = "data/{project}/figures/fst/fst_manhattan_locus.png"
     conda:
         "envs/py_visualization.yaml"
     script:
@@ -203,16 +275,40 @@ rule fst_manhattan:
 
 rule pi_dxy_calculation:
     input:
-        merged_vcf = "data/merged/merged.vcf.gz",
+        filtered_vcf = "/home/asgurkan/Documents/population_genomics/mysdav_renamed.vcf.gz",
         population1 = pop_files[0],
         population2 = pop_files[1]
     output:
-        dxy_text_file = "data/dxy_results.csv",
-        pi_text_file = "data/pi_results.csv"
+        dxy_text_file = "data/{project}/dxy_results.csv",
+        pi_text_file = "data/{project}/pi_results.csv"
     conda:
         "envs/pca_graph.yaml"
     log:
-        dxy_log_file = "logs/dxy_log_file.txt",
-        pi_log_file = "logs/pi_log_file.txt"
+        dxy_log_file = "logs/{project}/dxy_log_file.txt",
+        pi_log_file = "logs/{project}/pi_log_file.txt"
     script:
         "scripts/pi_dxy_calculation.R"
+
+rule report:
+    input:
+        locus_wise_syn_folder = directory("data/{project}/figures/locus_wise_syn_analysis"),
+        annotation_dist_piechart = "data/{project}/figures/annotation_dist_piechart.png",
+        pca = directory("data/{project}/figures/pca"),
+        adx = directory("data/{project}/admixture/K{K}"),
+        fst_fig = "data/{project}/figures/fst/fst_manhattan_locus.png",
+        dxy_file = "data/{project}/dxy_results.csv",
+        pi_file = "data/{project}/pi_results.csv"
+    output:
+        dummy_output = "data/{project}/report_complete{K}.txt"  
+    shell:
+        """
+        echo "Generating report for project {wildcards.project} with K={wildcards.K}" > {output}
+        echo "PCA dir: {input.pca}" >> {output}
+        echo "Admixture dir: {input.adx}" >> {output}
+        echo "FST figure: {input.fst_fig}" >> {output}
+        echo "Annotated VCF : {input.annotated_vcf}" >> {output}
+        echo "locus_wise_syn_folder : {input.locus_wise_syn_folder}" >> {output}
+        echo "annotation_dist_piechart : {input.annotation_dist_piechart}" >> {output}
+        echo "dxy_file : {input.dxy_file}" >> {output}
+        echo "pi_file : {input.pi_file}" >> {output}
+        """

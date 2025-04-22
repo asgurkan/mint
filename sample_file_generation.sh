@@ -4,18 +4,18 @@
 # This script validates a VCF file, extracts sample names,
 # and generates a "sample.tsv" file with specific columns.
 # Additionally, it creates population files based on the population column.
+# It also saves the provided GenBank file path in a "gb_file_path.txt".
 #
 # Usage:
-#   ./create_sample_tsv.sh <input_vcf> <project_name>
+#   ./create_sample_tsv.sh <input_vcf> <project_name> <gb_file_path>
 #
 # Example:
-#   ./create_sample_tsv.sh example.vcf MyProject
-#
+#   ./create_sample_tsv.sh example.vcf MyProject /path/to/genbank_file.gbk
 
 # -------- Script Settings --------
-set -o errexit   # Exit immediately if a command exits with a non-zero status
-set -o nounset   # Treat unset variables as an error when substituting
-set -o pipefail  # Pipeline returns the exit status of the last command that fails
+set -o errexit   # Exit immediately if a command exits with a non-zero status.
+set -o nounset   # Treat unset variables as an error when substituting.
+set -o pipefail  # Pipeline returns the exit status of the last command that fails.
 
 # Default LOG_LEVEL
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
@@ -27,7 +27,7 @@ log() {
     local message="$*"
     local timestamp
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-
+    
     case "$level" in
         INFO)
             [[ "$LOG_LEVEL" =~ ^(INFO|WARNING)$ ]] && echo "[$timestamp] [INFO]    $message"
@@ -43,17 +43,18 @@ log() {
 
 # -------- Usage Function ---------
 usage() {
-    echo "Usage: $0 <input_vcf> <project_name>"
+    echo "Usage: $0 <input_vcf> <project_name> <gb_file_path>"
     exit 1
 }
 
 # ------ Argument Validation ------
-if [[ $# -lt 2 ]]; then
+if [[ $# -lt 3 ]]; then
     usage
 fi
 
 INPUT_VCF="$1"
 PROJECT_NAME="$2"
+GB_FILE_PATH="$3"
 
 # ------ Command Availability -----
 if ! command -v bcftools &>/dev/null; then
@@ -90,7 +91,7 @@ else
 fi
 
 # ------ bcftools Readability -----
-# Suppress bcftools' own error output to ensure only one error message if invalid
+# Suppress bcftools' own error output to ensure only one error message if invalid.
 if ! bcftools query -l "$INPUT_VCF" >/dev/null 2>&1; then
     log "ERROR" "Could not read from $INPUT_VCF with bcftools. Please ensure it is a valid VCF file."
     exit 1
@@ -100,12 +101,13 @@ fi
 log "INFO" "Script started."
 log "INFO" "VCF file: $INPUT_VCF"
 log "INFO" "Project name: $PROJECT_NAME"
+log "INFO" "GenBank file path: $GB_FILE_PATH"
 
 # ---- Creating the sample.tsv ----
 log "INFO" "Creating sample.tsv..."
 echo -e "sample\tpopulation\tproject\tpath" > sample.tsv
 
-# This query is guaranteed to succeed now, as we checked above
+# This query is guaranteed to succeed now, as we checked above.
 bcftools query -l "$INPUT_VCF" | awk -v project="$PROJECT_NAME" -v path="$INPUT_VCF" -F"_" '{
     print $0 "\t" $(NF-1)"_"$NF "\t" project "\t" path
 }' >> sample.tsv
@@ -114,13 +116,20 @@ log "INFO" "sample.tsv created successfully!"
 
 # ---- Create population files ----
 log "INFO" "Creating population files..."
-# Read population names from the sample.tsv and create individual population files
+# Read population names from the sample.tsv and create individual population files.
 awk -F'\t' 'NR > 1 {print $2}' sample.tsv | sort | uniq | while read population; do
-    # Create a population file for each population
+    # Create a population file for each population.
     population_file="population_files/$population.txt"
-    mkdir -p population_files  # Ensure the directory exists
+    mkdir -p population_files  # Ensure the directory exists.
     awk -v pop="$population" -F'\t' '$2 == pop {print $1}' sample.tsv > "$population_file"
     log "INFO" "Population file created: $population_file"
 done
 
 log "INFO" "Population files created successfully!"
+
+# ---- Save GenBank file path ----
+log "INFO" "Saving GenBank file path to gb_file_path.txt..."
+echo "$GB_FILE_PATH" > gb_file_path.txt
+log "INFO" "GenBank file path saved in gb_file_path.txt"
+
+log "INFO" "Script completed successfully!"

@@ -19,7 +19,7 @@ library(ggrepel)
 # input
 eigenvec_path <- snakemake@input[["eigenvec_path"]]
 eigenval_path <- snakemake@input[["eigenval_path"]]
-sample_tsv_path <- snakemake@input[["sample_tsv_path"]]
+sample_tsv_path <- snakemake@input[["sample_tsv"]]
 
 # output
 output_dir <- snakemake@output[["pca_output_dir"]]

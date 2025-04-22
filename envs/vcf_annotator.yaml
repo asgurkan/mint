@@ -1,0 +1,12 @@
+name: vcf-annotator-env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.7
+  - vcf-annotator
+  - htslib
+  - biopython>=1.65
+  - pyvcf==0.6.8
+  - cyvcf2

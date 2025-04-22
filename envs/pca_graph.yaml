@@ -9,9 +9,9 @@ dependencies:
   - r-ggplot2
   - r-ggrepel
   - r-vcfR
-  - r-devtools  # Needed for installing packages from GitHub
-  - r-BiocManager  # For installing Bioconductor packages
-  - bioconductor-genomicranges  # Bioconductor package for GenomicRanges
-  - bioconductor-rsamtools     # Bioconductor package for Rsamtools
-  - bioconductor-rhtslib       # Bioconductor package for Rhtslib
-  - bioconductor-biostrings    # Bioconductor package for Biostrings
+  - r-devtools  
+  - r-BiocManager  
+  - bioconductor-genomicranges  
+  - bioconductor-rsamtools     
+  - bioconductor-rhtslib       
+  - bioconductor-biostrings    
