@@ -1,10 +1,10 @@
 from Bio import SeqIO
 
 # input
-gb_file = "/home/asgurkan/Documents/population_genomics/GCF_014108235.1_mMyoMyo1.p_genomic.gbff"
-vcf_in = "data/mysdav/variants/filtered.vcf"
+gb_file = snakemake.input.ref_gb
+vcf_in = snakemake.input.vcf
 # output
-vcf_out = "data/mysdav/variants/filtered_renamed.vcf"
+vcf_out = snakemake.output.annotated_vcf
 
 loci = [record.id for record in SeqIO.parse(gb_file, "genbank")]
 

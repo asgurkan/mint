@@ -6,7 +6,7 @@ configfile: "config.yml"
 # paths 
 gb_file_path = "gb_file_path.txt"
 sample_tsv_path = "sample.tsv"
-
+K_VALUES = list(map(str, range(1, 6))) 
 ### Variables 
 samples = pd.read_csv(sample_tsv_path, sep = "\t")
 
@@ -42,7 +42,7 @@ rule all:
         #expand("data/{project}/figures/pca", project = get_project())
         #expand("data/{project}/figures/fst/fst_manhattan_locus.png", project = get_project())
         #expand("data/{project}/admixture/K{K}", project = get_project(), K = config["admixture"]["k_value"])
-        expand("data/{project}/report_complete{K}.txt", project = get_project(), K = config["admixture"]["k_value"]) 
+        expand("data/{project}/report_complete{K}.txt", project = get_project(), K=K_VALUES) 
 
 # Rules 
 rule retrieve_raw_vcf:
@@ -227,12 +227,12 @@ rule admixture:
         bim = "data/{project}/ld_pruning/pruned.bim",
         fam = "data/{project}/ld_pruning/pruned.fam",
     output:
-        cv_error = "data/{project}/admixture/cv_error/admixture_cv_error_K{K}.txt",
+        cv_error = "data/{project}/admixture/K{K}/admixture_cv_error_K{K}.txt",
         output = directory("data/{project}/admixture/K{K}"),
         P = "data/{project}/admixture/K{K}/pruned.{K}.P",
         Q = "data/{project}/admixture/K{K}/pruned.{K}.Q"
     params:
-        K = config["admixture"]["k_value"]
+        K = lambda wildcards: wildcards.K
     conda:
         "envs/admixture.yaml"
     shell:
@@ -241,6 +241,20 @@ rule admixture:
         mv pruned.{params.K}.P {output.P}
         mv pruned.{params.K}.Q {output.Q}
         """
+
+rule admixture_visualization:
+    input:
+        cv_errors = expand("data/{project}/admixture/K{K}/admixture_cv_error_K{K}.txt",
+                            K=K_VALUES, 
+                            project=get_project())
+    output:
+        adx_error_table = "data/{project}/admixture/admixture_cv_errors.csv",
+        adx_error_figure = "data/{project}/figures/admixture/error_plot.png"
+    conda:
+        "envs/py_visualization.yaml"
+    script:
+        "scripts/admixture_error_line_vis.py"
+
 
 rule fst:
     input:
@@ -275,7 +289,7 @@ rule fst_manhattan:
 
 rule pi_dxy_calculation:
     input:
-        filtered_vcf = "/home/asgurkan/Documents/population_genomics/mysdav_renamed.vcf.gz",
+        filtered_vcf = "/home/asgurkan/Documents/population_genomics/march_data/raw/mysdav_renamed.vcf.gz",
         population1 = pop_files[0],
         population2 = pop_files[1]
     output:
@@ -295,9 +309,8 @@ rule report:
         annotation_dist_piechart = "data/{project}/figures/annotation_dist_piechart.png",
         pca = directory("data/{project}/figures/pca"),
         adx = directory("data/{project}/admixture/K{K}"),
+        adx_error_table = "data/{project}/admixture/admixture_cv_errors.csv",
         fst_fig = "data/{project}/figures/fst/fst_manhattan_locus.png",
-        dxy_file = "data/{project}/dxy_results.csv",
-        pi_file = "data/{project}/pi_results.csv"
     output:
         dummy_output = "data/{project}/report_complete{K}.txt"  
     shell:
@@ -305,10 +318,8 @@ rule report:
         echo "Generating report for project {wildcards.project} with K={wildcards.K}" > {output}
         echo "PCA dir: {input.pca}" >> {output}
         echo "Admixture dir: {input.adx}" >> {output}
+        echo "Admixture error file: {input.adx_error_table}" >> {output}
         echo "FST figure: {input.fst_fig}" >> {output}
-        echo "Annotated VCF : {input.annotated_vcf}" >> {output}
         echo "locus_wise_syn_folder : {input.locus_wise_syn_folder}" >> {output}
         echo "annotation_dist_piechart : {input.annotation_dist_piechart}" >> {output}
-        echo "dxy_file : {input.dxy_file}" >> {output}
-        echo "pi_file : {input.pi_file}" >> {output}
         """
