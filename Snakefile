@@ -9,6 +9,7 @@ sample_tsv_path = "sample.tsv"
 K_VALUES = list(map(str, range(1, 6))) 
 ### Variables 
 samples = pd.read_csv(sample_tsv_path, sep = "\t")
+SAMPLES = [line.strip() for line in open("samples.txt")]
 
 ### Functions
 def get_samples():
@@ -36,15 +37,50 @@ if len(pop_files) < 2:
 # Rule all
 rule all:
     input:
-        #expand("data/{project}/annotations/annotations.csv", project = get_project())
-        #directory(expand(("data/{project}/figures/locus_wise_syn_analysis"), project = get_project()))
-        #expand("data/{project}/variants/filtered.vcf.gz", project = get_project())
-        #expand("data/{project}/figures/pca", project = get_project())
+        expand("data/{sample}/aligned/{sample}.pe.sam", sample=SAMPLES),
         #expand("data/{project}/figures/fst/fst_manhattan_locus.png", project = get_project())
-        #expand("data/{project}/admixture/K{K}", project = get_project(), K = config["admixture"]["k_value"])
-        expand("data/{project}/report_complete{K}.txt", project = get_project(), K=K_VALUES) 
+        #expand("data/{project}/figures/admixture/plots/admix_plot_K_{K}.png", project = get_project(), K=K_VALUES)
+        #expand("data/{project}/report_complete{K}.txt", project = get_project(), K=K_VALUES) 
 
 # Rules 
+
+rule fastp:
+    input:
+        r1 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R1_001.fastq.gz",
+        r2 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R2_001.fastq.gz"
+    output:
+        r1_trimmed = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
+        r2_trimmed = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz",
+        html = "data/raw/{sample}/qc/{sample}_fastp.html",
+        json = "data/raw/{sample}/qc/{sample}_fastp.json"
+    threads: 12
+    conda:
+        "envs/fastp.yaml"
+    shell:
+        """
+        fastp \
+            -i {input.r1} -I {input.r2} \
+            -o {output.r1_trimmed} -O {output.r2_trimmed} \
+            -h {output.html} -j {output.json} \
+            -w {threads} --detect_adapter_for_pe
+        """
+
+rule bwa_mem_pe:
+    input:
+        ref = "workspace/GCF_000327345.1_ASM32734v1_genomic.fna",
+        r1 = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
+        r2 = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz"
+    output:
+        sam = "data/{sample}/aligned/{sample}.pe.sam"
+    threads: 20
+    conda:
+        "envs/bwa.yaml"
+    shell:
+        """
+        bwa mem -t {threads} -L 1000,1000 {input.ref} {input.r1} {input.r2} > {output.sam}
+        """
+
+
 rule retrieve_raw_vcf:
     input: 
         raw_vcf = get_raw_vcf()
@@ -256,6 +292,23 @@ rule admixture_visualization:
         "scripts/admixture_error_line_vis.py"
 
 
+rule plot_admixture:
+    input:
+        fam = "data/{project}/ld_pruning/pruned.fam",
+        qs = "data/{project}/admixture/K{K}/pruned.{K}.Q"
+    output:
+        plot_admixture_png = "data/{project}/figures/admixture/plots/admix_plot_K_{K}.png"
+    params:
+        q_prefix = "data/{project}/admixture",  
+        out_dir = "data/{project}/figures/admixture/plots",
+        max_k = len(K_VALUES)
+    conda:
+        "envs/admixture_plot_env.yaml"
+    shell:
+        """
+        Rscript scripts/plot_admixture.R {input.fam} {params.q_prefix} {params.max_k} {params.out_dir}
+        """
+
 rule fst:
     input:
         input_vcf = "data/{project}/variants/filtered.vcf"
@@ -309,6 +362,7 @@ rule report:
         annotation_dist_piechart = "data/{project}/figures/annotation_dist_piechart.png",
         pca = directory("data/{project}/figures/pca"),
         adx = directory("data/{project}/admixture/K{K}"),
+        
         adx_error_table = "data/{project}/admixture/admixture_cv_errors.csv",
         fst_fig = "data/{project}/figures/fst/fst_manhattan_locus.png",
     output:

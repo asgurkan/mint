@@ -8,3 +8,6 @@ sample.tsv
 logs
 population_files
 reference_genbank
+samples.tsv
+samples.txt
+raw_data
