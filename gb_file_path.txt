@@ -1,1 +1,0 @@
-/home/asgurkan/Documents/population_genomics/reference_genbank/GCF_014108235.1_mMyoMyo1.p_genomic.gbff

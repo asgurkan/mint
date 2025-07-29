@@ -9,7 +9,6 @@ sample_tsv_path = "sample.tsv"
 K_VALUES = list(map(str, range(1, 6))) 
 ### Variables 
 samples = pd.read_csv(sample_tsv_path, sep = "\t")
-SAMPLES = [line.strip() for line in open("samples.txt")]
 
 ### Functions
 def get_samples():
@@ -19,6 +18,10 @@ def get_samples():
 def get_project():
     """Returns list of projects."""
     return list(samples["project"].unique())
+
+def get_vcf_path():
+    """Returns list of projects."""
+    return list(samples["path"].unique())
 
 def get_raw_vcf():
     """ Returns raw vcf path. """
@@ -37,137 +40,153 @@ if len(pop_files) < 2:
 # Rule all
 rule all:
     input:
-        expand("data/{sample}/aligned/{sample}.pe.sam", sample=SAMPLES),
+        expand( "data/{project}/report_complete{K}.txt", sample=get_samples(), project = get_project(), K=K_VALUES),
         #expand("data/{project}/figures/fst/fst_manhattan_locus.png", project = get_project())
         #expand("data/{project}/figures/admixture/plots/admix_plot_K_{K}.png", project = get_project(), K=K_VALUES)
         #expand("data/{project}/report_complete{K}.txt", project = get_project(), K=K_VALUES) 
 
 # Rules 
 
-rule fastp:
-    input:
-        r1 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R1_001.fastq.gz",
-        r2 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R2_001.fastq.gz"
-    output:
-        r1_trimmed = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
-        r2_trimmed = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz",
-        html = "data/raw/{sample}/qc/{sample}_fastp.html",
-        json = "data/raw/{sample}/qc/{sample}_fastp.json"
-    threads: 12
-    conda:
-        "envs/fastp.yaml"
-    shell:
-        """
-        fastp \
-            -i {input.r1} -I {input.r2} \
-            -o {output.r1_trimmed} -O {output.r2_trimmed} \
-            -h {output.html} -j {output.json} \
-            -w {threads} --detect_adapter_for_pe
-        """
+# rule fastp:
+#     input:
+#         r1 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R1_001.fastq.gz",
+#         r2 = "/home/asgurkan/Documents/population_genomics/workspace/files_from_bengisu/RP23-238-22020_S131_L003_R2_001.fastq.gz"
+#     output:
+#         r1_trimmed = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
+#         r2_trimmed = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz",
+#         html = "data/raw/{sample}/qc/{sample}_fastp.html",
+#         json = "data/raw/{sample}/qc/{sample}_fastp.json"
+#     threads: 12
+#     conda:
+#         "envs/fastp.yaml"
+#     shell:
+#         """
+#         fastp \
+#             -i {input.r1} -I {input.r2} \
+#             -o {output.r1_trimmed} -O {output.r2_trimmed} \
+#             -h {output.html} -j {output.json} \
+#             -w {threads} --detect_adapter_for_pe
+#         """
 
-rule bwa_mem_pe:
-    input:
-        ref = "workspace/GCF_000327345.1_ASM32734v1_genomic.fna",
-        r1 = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
-        r2 = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz"
-    output:
-        sam = "data/{sample}/aligned/{sample}.pe.sam"
-    threads: 20
-    conda:
-        "envs/bwa.yaml"
-    shell:
-        """
-        bwa mem -t {threads} -L 1000,1000 {input.ref} {input.r1} {input.r2} > {output.sam}
-        """
+# rule bwa_mem_pe:
+#     input:
+#         ref = "workspace/GCF_000327345.1_ASM32734v1_genomic.fna",
+#         r1 = "data/raw/{sample}/clean/{sample}_R1.trimmed.fastq.gz",
+#         r2 = "data/raw/{sample}/clean/{sample}_R2.trimmed.fastq.gz"
+#     output:
+#         sam = "data/{sample}/aligned/{sample}.pe.sam"
+#     threads: 20
+#     conda:
+#         "envs/bwa.yaml"
+#     shell:
+#         """
+#         bwa mem -t {threads} -L 1000,1000 {input.ref} {input.r1} {input.r2} > {output.sam}
+#         """
 
 
-rule retrieve_raw_vcf:
-    input: 
-        raw_vcf = get_raw_vcf()
-    output: 
-        raw_vcf_project = "data/{project}/variants/raw.vcf"
-    shell:
-        "cp {input.raw_vcf} {output.raw_vcf_project}"
+# rule retrieve_raw_vcf:
+#     input: 
+#         raw_vcf = get_raw_vcf()
+#     output: 
+#         raw_vcf_project = "data/{project}/variants/raw.vcf"
+#     shell:
+#         "cp {input.raw_vcf} {output.raw_vcf_project}"
 
-rule pop_variant_filter:
-    input:
-        raw_vcf = "data/{project}/variants/raw.vcf"
-    output:
-        filtered_vcf = "data/{project}/variants/filtered.vcf"
-    conda:
-        "envs/bcftools.yaml"
-    params:
-        filter_expr='MAF>=0.05'
-        # filter_expr='MAF>=0.05 && COUNT(GT=="./.")/N_SAMPLES<0.5'
-    shell:
-        "bcftools filter -i '{params.filter_expr}' {input.raw_vcf} -o {output.filtered_vcf}"
+# rule pop_variant_filter:
+#     input:
+#         raw_vcf = "data/{project}/variants/raw.vcf"
+#     output:
+#         filtered_vcf = "data/{project}/variants/filtered.vcf"
+#     conda:
+#         "envs/bcftools.yaml"
+#     params:
+#         filter_expr='MAF>=0.05'
+#         # filter_expr='MAF>=0.05 && COUNT(GT=="./.")/N_SAMPLES<0.5'
+#     shell:
+#         "bcftools filter -i '{params.filter_expr}' {input.raw_vcf} -o {output.filtered_vcf}"
 
-rule rename_vcf_locus:
-    input:
-        vcf = "data/{project}/variants/filtered.vcf",
-        ref_gb = ref_gb()
-    output:
-        annotated_vcf = "data/{project}/variants/filtered_renamed.vcf"
-    conda:
-        "envs/vcf_annotator.yaml"
-    script:
-        "scripts/rename_vcf.py"
+# rule rename_vcf_locus:
+#     input:
+#         vcf = "data/{project}/variants/filtered.vcf",
+#         ref_gb = ref_gb()
+#     output:
+#         annotated_vcf = "data/{project}/variants/filtered_renamed.vcf"
+#     conda:
+#         "envs/vcf_annotator.yaml"
+#     script:
+#         "scripts/rename_vcf.py"
 
-rule annotate_vcf:
-    input:
-        vcf = "data/{project}/variants/filtered_renamed.vcf",
-        ref_gb = ref_gb()
-    output:
-        annotated_vcf = "data/{project}/annotations/annotated.vcf"
-    conda:
-        "envs/vcf_annotator.yaml"
-    shell:
-        """
-        vcf-annotator --output {output.annotated_vcf} {input.vcf} {input.ref_gb} 
-        """
+# rule annotate_vcf:
+#     input:
+#         vcf = "data/{project}/variants/filtered_renamed.vcf",
+#         ref_gb = ref_gb()
+#     output:
+#         annotated_vcf = "data/{project}/annotations/annotated.vcf"
+#     conda:
+#         "envs/vcf_annotator.yaml"
+#     shell:
+#         """
+#         vcf-annotator --output {output.annotated_vcf} {input.vcf} {input.ref_gb} 
+#         """
 
-rule vcf2csv:
-    input:
-        annotated_vcf = "data/{project}/annotations/annotated.vcf"
-    output:
-        annotations_csv = "data/{project}/annotations/annotations.csv"
-    conda:
-        "envs/vcf_annotator.yaml"
-    script:
-        "scripts/annotation2csv.py"
+# rule vcf2csv:
+#     input:
+#         annotated_vcf = "data/{project}/annotations/annotated.vcf"
+#     output:
+#         annotations_csv = "data/{project}/annotations/annotations.csv"
+#     conda:
+#         "envs/vcf_annotator.yaml"
+#     script:
+#         "scripts/annotation2csv.py"
 
-rule annotation_dist_piechart:
-    input:
-        annotations_csv = "data/{project}/annotations/annotations.csv"
-    output:
-        piechart = "data/{project}/figures/annotation_dist_piechart.png"
-    conda:
-        "envs/py_visualization.yaml"
-    script:
-        "scripts/annotation_dist_piechart.py"
+# rule annotation_dist_piechart:
+#     input:
+#         annotations_csv = "data/{project}/annotations/annotations.csv"
+#     output:
+#         piechart = "data/{project}/figures/annotation_dist_piechart.png"
+#     conda:
+#         "envs/py_visualization.yaml"
+#     script:
+#         "scripts/annotation_dist_piechart.py"
 
-rule gene_syn_dist:
-    input:
-        annotations_csv = "data/{project}/annotations/annotations.csv"
-    output:
-        locus_wise_syn_dir = directory("data/{project}/figures/locus_wise_syn_analysis")
-    conda:
-        "envs/py_visualization.yaml"
-    script:
-        "scripts/gene_syn_dist.py"
+# rule gene_syn_dist:
+#     input:
+#         annotations_csv = "data/{project}/annotations/annotations.csv"
+#     output:
+#         locus_wise_syn_dir = directory("data/{project}/figures/locus_wise_syn_analysis")
+#     conda:
+#         "envs/py_visualization.yaml"
+#     script:
+#         "scripts/gene_syn_dist.py"
 
-rule gzip_merge:
-    input:
-        merged = "data/{project}/variants/filtered.vcf"
-    output:
-        merged_gz = "data/{project}/variants/filtered.vcf.gz"
-    shell:
-        "bgzip -k {input.merged} -o {output.merged_gz}"
+# rule gzip_merge:
+#     input:
+#         merged = "data/{project}/variants/filtered.vcf"
+#     output:
+#         merged_gz = "data/{project}/variants/filtered.vcf.gz"
+#     shell:
+#         "bgzip -k {input.merged} -o {output.merged_gz}"
+
+
+
+############################################################
+# rule heterozygosity:
+#     input:
+#         vcf = "results/filtered/{sample}.vcf"
+#     output:
+#         tsv = "results/heterozygosity/{sample}_heterozygosity.tsv",
+#         log = "results/heterozygosity/{sample}_heterozygosity.log"
+#     params:
+#         script = "scripts/heterozygosity.sh"
+#     shell:
+#         """
+#         bash {params.script} {input.vcf} {output.tsv} > /dev/null 2>&1
+#         """
+############################################################
 
 rule ld_pruning:
     input:
-        #vcf = "data/{project}/variants/raw.vcf"      # check filtering exp. 
-        vcf = "data/{project}/variants/filtered.vcf"
+        vcf = get_vcf_path()
     output:
         prune_in="data/{project}/ld_pruning/temp.prune.in",
         prune_out="data/{project}/ld_pruning/temp.prune.out",
@@ -311,7 +330,7 @@ rule plot_admixture:
 
 rule fst:
     input:
-        input_vcf = "data/{project}/variants/filtered.vcf"
+        input_vcf = get_vcf_path()
     output:
         windowed_fst = "data/{project}/fst/{project}.windowed.weir.fst"
     params:
@@ -358,13 +377,10 @@ rule pi_dxy_calculation:
 
 rule report:
     input:
-        locus_wise_syn_folder = directory("data/{project}/figures/locus_wise_syn_analysis"),
-        annotation_dist_piechart = "data/{project}/figures/annotation_dist_piechart.png",
         pca = directory("data/{project}/figures/pca"),
-        adx = directory("data/{project}/admixture/K{K}"),
-        
+        adx = directory("data/{project}/admixture/K{K}"),     
         adx_error_table = "data/{project}/admixture/admixture_cv_errors.csv",
-        fst_fig = "data/{project}/figures/fst/fst_manhattan_locus.png",
+        fst_fig = "data/{project}/figures/fst/fst_manhattan_locus.png"
     output:
         dummy_output = "data/{project}/report_complete{K}.txt"  
     shell:
@@ -374,6 +390,4 @@ rule report:
         echo "Admixture dir: {input.adx}" >> {output}
         echo "Admixture error file: {input.adx_error_table}" >> {output}
         echo "FST figure: {input.fst_fig}" >> {output}
-        echo "locus_wise_syn_folder : {input.locus_wise_syn_folder}" >> {output}
-        echo "annotation_dist_piechart : {input.annotation_dist_piechart}" >> {output}
         """
